@@ -1,13 +1,14 @@
-﻿#include <iostream>
+#include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <string>
 #include <sstream>
-#include <conio.h> // For getch() in Windows
+#include <conio.h> // For _getch() on Windows
+#include <limits>  // For input validation
 
 using namespace std;
 
-// Structure for item
+// Item Structure
 struct Item {
     int id;
     string name;
@@ -17,7 +18,7 @@ struct Item {
 
 const string filename = "inventory.txt";
 
-// Hardcoded login credentials
+// Hardcoded credentials
 const string ADMIN_USERNAME = "admin";
 const string ADMIN_PASSWORD = "admin123";
 const string USER_USERNAME = "user";
@@ -35,7 +36,7 @@ string login();
 bool isIdUnique(int);
 bool parseItem(const string&, Item&);
 
-// Main function
+// Main Function
 int main() {
     while (true) {
         string role = login();
@@ -49,6 +50,13 @@ int main() {
             cout << "Enter your choice: ";
             cin >> choice;
 
+            if (cin.fail()) {
+                cin.clear();
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                cout << "❌ Invalid input. Enter a number.\n";
+                continue;
+            }
+
             if (role == "admin") {
                 switch (choice) {
                 case 1: addItem(); break;
@@ -57,7 +65,7 @@ int main() {
                 case 4: updateItem(); break;
                 case 5: deleteItem(); break;
                 case 0: cout << "Logging out...\n"; break;
-                default: cout << "Invalid choice.\n";
+                default: cout << "❌ Invalid choice.\n";
                 }
             }
             else {
@@ -65,7 +73,7 @@ int main() {
                 case 1: displayItems(); break;
                 case 2: searchItem(); break;
                 case 0: cout << "Logging out...\n"; break;
-                default: cout << "Invalid choice.\n";
+                default: cout << "❌ Invalid choice.\n";
                 }
             }
         } while (choice != 0);
@@ -74,7 +82,7 @@ int main() {
     return 0;
 }
 
-// Login function with masking and option to go back
+// Login with password masking
 string login() {
     string uname, pass;
     char ch;
@@ -95,8 +103,8 @@ string login() {
     cout << "Password: ";
     pass = "";
     ch = _getch();
-    while (ch != 13) {
-        if (ch == 8 && !pass.empty()) {
+    while (ch != 13) { // Enter
+        if (ch == 8 && !pass.empty()) { // Backspace
             cout << "\b \b";
             pass.pop_back();
         }
@@ -122,7 +130,7 @@ string login() {
     }
 }
 
-// Admin menu
+// Admin Menu
 void adminMenu() {
     cout << "\n--- Admin Menu ---\n";
     cout << "1. Add Item\n";
@@ -133,7 +141,7 @@ void adminMenu() {
     cout << "0. Logout\n";
 }
 
-// User menu
+// User Menu
 void userMenu() {
     cout << "\n--- User Menu ---\n";
     cout << "1. Display All Items\n";
@@ -141,7 +149,7 @@ void userMenu() {
     cout << "0. Logout\n";
 }
 
-// Helper: Parse item from a line
+// Helper: Parse item
 bool parseItem(const string& line, Item& item) {
     stringstream ss(line);
     string temp;
@@ -160,27 +168,37 @@ bool parseItem(const string& line, Item& item) {
     return true;
 }
 
-// Check if ID is unique
+// Check ID uniqueness
 bool isIdUnique(int idToCheck) {
     ifstream file(filename);
+    if (!file.is_open()) return true;
+
     string line;
     Item item;
-
     while (getline(file, line)) {
-        if (parseItem(line, item)) {
-            if (item.id == idToCheck) return false;
+        if (parseItem(line, item) && item.id == idToCheck) {
+            return false;
         }
     }
     return true;
 }
 
-// Add item
+// Add new item
 void addItem() {
     ofstream file(filename, ios::app);
+    if (!file) {
+        cout << "❌ Could not open file to write.\n";
+        return;
+    }
+
     Item item;
 
     cout << "Enter Item ID: ";
     cin >> item.id;
+    if (cin.fail()) {
+        cin.clear(); cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cout << "❌ Invalid ID.\n"; return;
+    }
 
     if (!isIdUnique(item.id)) {
         cout << "❌ ID already exists. Use a unique ID.\n";
@@ -190,35 +208,47 @@ void addItem() {
     cout << "Enter Item Name: ";
     cin.ignore();
     getline(cin, item.name);
+
     cout << "Enter Quantity: ";
     cin >> item.quantity;
+    if (cin.fail()) {
+        cin.clear(); cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cout << "❌ Invalid quantity.\n"; return;
+    }
+
     cout << "Enter Price: ";
     cin >> item.price;
+    if (cin.fail()) {
+        cin.clear(); cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cout << "❌ Invalid price.\n"; return;
+    }
 
-    file << item.id << "|" << item.name << "|" << item.quantity << "|" << item.price << endl;
+    file << item.id << "|" << item.name << "|" << item.quantity << "|" << item.price << "\n";
     file.close();
-
     cout << "✅ Item added successfully.\n";
 }
 
 // Display all items
 void displayItems() {
     ifstream file(filename);
+    if (!file) {
+        cout << "❌ Could not open file.\n";
+        return;
+    }
+
     string line;
     Item item;
 
     cout << "\n--- Inventory List ---\n";
-    cout << left << setw(10) << "ID"
-        << setw(20) << "Name"
-        << setw(10) << "Qty"
-        << setw(10) << "Price" << endl;
+    cout << left << setw(10) << "ID" << setw(20) << "Name" 
+         << setw(10) << "Qty" << setw(10) << "Price\n";
 
     while (getline(file, line)) {
         if (parseItem(line, item)) {
             cout << left << setw(10) << item.id
-                << setw(20) << item.name
-                << setw(10) << item.quantity
-                << setw(10) << item.price << endl;
+                 << setw(20) << item.name
+                 << setw(10) << item.quantity
+                 << setw(10) << item.price << "\n";
         }
     }
 
@@ -228,19 +258,29 @@ void displayItems() {
 // Search item by ID
 void searchItem() {
     ifstream file(filename);
-    string line;
-    Item item;
-    int searchId;
-    bool found = false;
+    if (!file) {
+        cout << "❌ Could not open file.\n";
+        return;
+    }
 
+    int searchId;
     cout << "Enter Item ID to search: ";
     cin >> searchId;
+
+    if (cin.fail()) {
+        cin.clear(); cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cout << "❌ Invalid ID.\n"; return;
+    }
+
+    string line;
+    Item item;
+    bool found = false;
 
     while (getline(file, line)) {
         if (parseItem(line, item) && item.id == searchId) {
             cout << "\nItem Found:\n";
             cout << "ID: " << item.id << "\nName: " << item.name
-                << "\nQuantity: " << item.quantity << "\nPrice: " << item.price << endl;
+                 << "\nQuantity: " << item.quantity << "\nPrice: " << item.price << "\n";
             found = true;
             break;
         }
@@ -253,14 +293,29 @@ void searchItem() {
 // Update item
 void updateItem() {
     ifstream file(filename);
-    ofstream temp("temp.txt");
-    string line;
-    Item item;
-    int updateId;
-    bool found = false;
+    if (!file) {
+        cout << "❌ Could not open file.\n";
+        return;
+    }
 
+    ofstream temp("temp.txt");
+    if (!temp) {
+        cout << "❌ Could not create temp file.\n";
+        return;
+    }
+
+    int updateId;
     cout << "Enter Item ID to update: ";
     cin >> updateId;
+
+    if (cin.fail()) {
+        cin.clear(); cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cout << "❌ Invalid ID.\n"; return;
+    }
+
+    string line;
+    Item item;
+    bool found = false;
 
     while (getline(file, line)) {
         if (parseItem(line, item)) {
@@ -274,7 +329,7 @@ void updateItem() {
                 cin >> item.price;
                 found = true;
             }
-            temp << item.id << "|" << item.name << "|" << item.quantity << "|" << item.price << endl;
+            temp << item.id << "|" << item.name << "|" << item.quantity << "|" << item.price << "\n";
         }
     }
 
@@ -290,14 +345,37 @@ void updateItem() {
 // Delete item
 void deleteItem() {
     ifstream file(filename);
-    ofstream temp("temp.txt");
-    string line;
-    Item item;
-    int deleteId;
-    bool found = false;
+    if (!file) {
+        cout << "❌ Could not open file.\n";
+        return;
+    }
 
+    ofstream temp("temp.txt");
+    if (!temp) {
+        cout << "❌ Could not create temp file.\n";
+        return;
+    }
+
+    int deleteId;
     cout << "Enter Item ID to delete: ";
     cin >> deleteId;
+
+    if (cin.fail()) {
+        cin.clear(); cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cout << "❌ Invalid ID.\n"; return;
+    }
+
+    char confirm;
+    cout << "Are you sure you want to delete item " << deleteId << "? (Y/N): ";
+    cin >> confirm;
+    if (tolower(confirm) != 'y') {
+        cout << "❌ Deletion cancelled.\n";
+        return;
+    }
+
+    string line;
+    Item item;
+    bool found = false;
 
     while (getline(file, line)) {
         if (parseItem(line, item)) {
@@ -305,7 +383,7 @@ void deleteItem() {
                 found = true;
                 continue;
             }
-            temp << item.id << "|" << item.name << "|" << item.quantity << "|" << item.price << endl;
+            temp << item.id << "|" << item.name << "|" << item.quantity << "|" << item.price << "\n";
         }
     }
 
